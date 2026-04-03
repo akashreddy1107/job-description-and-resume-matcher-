@@ -169,12 +169,13 @@ if __name__ == "__main__":
         print("⚠️  WARNING: HF_TOKEN is not set. Copy .env.example to .env and add your token.")
     print(f"[HR LOGIN] Username: {HR_USERNAME}  |  Password: {HR_PASSWORD}")
 
-    host = os.getenv("FLASK_HOST", "127.0.0.1")
-    port = int(os.getenv("FLASK_PORT", "5000"))
-    debug = os.getenv("FLASK_DEBUG", "true").lower() in ("1", "true", "yes")
+    # Production-ready port handling for cloud hosts (Render/Heroku/etc)
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", os.getenv("FLASK_PORT", "5000")))
+    debug = os.getenv("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
 
     if host == "0.0.0.0":
-        print("🌐 Listening on all network interfaces — other PCs can use http://<this-computer-LAN-ip>:%s" % port)
+        print("🌐 Listening on all network interfaces — other PCs can use http://<this-computer-LAN-ip>:%d" % port)
         print("   (On Windows, find the IPv4 address in: ipconfig)")
 
     app.run(host=host, port=port, debug=debug)
