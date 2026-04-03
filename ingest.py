@@ -7,8 +7,10 @@ import numpy as np
 import re
 import spacy
 
-DATA_DIR = "data/sessions"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data/sessions")
 os.makedirs(DATA_DIR, exist_ok=True)
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
 _model = None
 _nlp = None
@@ -85,6 +87,10 @@ def process_files(session_id, files_info, hf_token):
     full_text = ""
     for f_info in files_info:
         file_path = f_info["file_path"]
+        # Ensure file_path is absolute if it isn't already
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(BASE_DIR, file_path)
+            
         orig_name = f_info["filename"]
         text = extract_text(file_path)
         

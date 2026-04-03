@@ -3,7 +3,9 @@ import os
 import uuid
 import datetime
 
-DB_PATH = "resume_analyzer.db"
+# Professional path handling for PythonAnywhere
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "resume_analyzer.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)

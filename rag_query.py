@@ -5,9 +5,12 @@ import numpy as np
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data/sessions")
 
-# ── Hugging Face Inference API config (all from .env) ────────────────────────
+# Load environment variables using absolute path
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 HF_API_URL = os.getenv("HF_API_URL", "https://router.huggingface.co/v1/chat/completions")
 HF_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 
@@ -26,10 +29,9 @@ def get_embeddings_from_api(texts: list[str], hf_token: str) -> np.ndarray:
     
     return np.array(response.json())
 
-
 def _load_index(session_id: str):
     """Load stored chunks and embeddings for a session."""
-    session_dir = f"data/sessions/{session_id}"
+    session_dir = os.path.join(DATA_DIR, session_id)
     chunk_path = os.path.join(session_dir, "chunks.pkl")
     emb_path = os.path.join(session_dir, "embeddings.pkl")
     if not os.path.exists(chunk_path) or not os.path.exists(emb_path):

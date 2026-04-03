@@ -5,8 +5,10 @@ import sys
 from dotenv import load_dotenv
 import rag_query
 
-# Load environment variables
-load_dotenv()
+# Load environment variables using absolute path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 HR_USERNAME = os.getenv("HR_USERNAME", "hr_admin")
 HR_PASSWORD = os.getenv("HR_PASSWORD", "Resume@2024")
@@ -15,7 +17,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key")
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
