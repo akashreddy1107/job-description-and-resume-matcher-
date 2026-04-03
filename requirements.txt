@@ -1,6 +1,5 @@
 flask
 pypdf
-sentence-transformers
 numpy
 requests
 python-dotenv

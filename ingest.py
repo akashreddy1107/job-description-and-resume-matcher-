@@ -1,7 +1,7 @@
 from pypdf import PdfReader
 import docx
-from sentence_transformers import SentenceTransformer
-import pickle
+# from sentence_transformers import SentenceTransformer  <-- REMOVED to save 500MB
+import rag_query  # Use remote embeddings instead
 import os
 import numpy as np
 import re
@@ -24,12 +24,8 @@ def get_nlp():
             _nlp = False
     return _nlp
 
-def get_model():
-    global _model
-    if _model is None:
-        print("[INFO] Loading SentenceTransformer model...")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+# Model loading removed - now use rag_query.get_embeddings_from_api
+
 
 def anonymize_text(text):
     # Regex for Emails
@@ -84,47 +80,37 @@ def extract_text(file_path):
                 text += para.text + "\n"
     return text
 
-def process_files(session_id, files_info):
-    """
-    files_info: list of dicts [{"filename": "...", "file_path": "..."}]
-    """
-    session_dir = os.path.join(DATA_DIR, session_id)
-    os.makedirs(session_dir, exist_ok=True)
-    
-    all_chunks = []
-
+def process_files(session_id, files_info, hf_token):
+    """Refactored to use remote embeddings via Hugging Face API."""
+    full_text = ""
     for f_info in files_info:
         file_path = f_info["file_path"]
         orig_name = f_info["filename"]
-        
         text = extract_text(file_path)
-        if not text.strip():
-            continue
-            
-        # 1. Anonymize the text (Blind RAG)
-        safe_text = anonymize_text(text)
         
-        # 2. Semantic Chunking
-        chunks = semantic_chunking(safe_text, max_chunk_size=1500)
-        
-        for c in chunks:
-            # Prefix chunk with source identifier
-            formatted_chunk = f"[Source: {orig_name}]\n{c}"
-            all_chunks.append(formatted_chunk)
+        # Add source tag for multi-hop retrieval traceability
+        full_text += f"\n\n[Source: {orig_name}]\n{text}"
 
-    if not all_chunks:
-        raise ValueError("No text could be extracted from the uploaded documents.")
+    # 1. Blind RAG: Anonymize
+    anonymized_text = anonymize_text(full_text)
 
-    print(f"[INFO] Extracted {len(all_chunks)} chunks for session {session_id}.")
+    # 2. Semantic Chunking
+    chunks = semantic_chunking(anonymized_text)
+    if not chunks:
+        return 0
 
-    model = get_model()
-    embeddings = model.encode(all_chunks, show_progress_bar=False, convert_to_numpy=True)
-
-    with open(os.path.join(session_dir, "chunks.pkl"), "wb") as f:
-        pickle.dump(all_chunks, f)
-
-    with open(os.path.join(session_dir, "embeddings.pkl"), "wb") as f:
+    # 3. Remote Embeddings (Saves 500MB+ disk space)
+    print(f"[INFO] Requesting embeddings for {len(chunks)} chunks via API...")
+    embeddings = rag_query.get_embeddings_from_api(chunks, hf_token)
+    
+    # 4. Save
+    session_dir = f"{DATA_DIR}/{session_id}"
+    os.makedirs(session_dir, exist_ok=True)
+    
+    with open(f"{session_dir}/chunks.pkl", "wb") as f:
+        pickle.dump(chunks, f)
+    with open(f"{session_dir}/embeddings.pkl", "wb") as f:
         pickle.dump(embeddings, f)
-
-    print(f"[SUCCESS] Indexed {len(all_chunks)} chunks successfully!")
-    return len(all_chunks)
+        
+    print(f"[SUCCESS] Indexed {len(chunks)} chunks successfully!")
+    return len(chunks)

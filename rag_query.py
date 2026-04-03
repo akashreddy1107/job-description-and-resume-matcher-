@@ -1,7 +1,7 @@
 import os
 import pickle
 import numpy as np
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer  <-- REMOVED to save 500MB disk space
 import requests
 from dotenv import load_dotenv
 
@@ -11,14 +11,20 @@ load_dotenv()
 HF_API_URL = os.getenv("HF_API_URL", "https://router.huggingface.co/v1/chat/completions")
 HF_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 
-# ── Load model once at module level (cached after first call) ─────────────────
-_model = None
+# ── Remote Embeddings API ─────────────────────────────────────────────────────
+EMBED_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
+EMBED_API_URL = f"https://router.huggingface.co/hf-inference/models/{EMBED_MODEL_ID}/pipeline/feature-extraction"
 
-def _get_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+def get_embeddings_from_api(texts: list[str], hf_token: str) -> np.ndarray:
+    """Gets embeddings from Hugging Face Inference API instead of local model."""
+    headers = {"Authorization": f"Bearer {hf_token}"}
+    payload = {"inputs": texts, "options": {"wait_for_model": True}}
+    
+    response = requests.post(EMBED_API_URL, headers=headers, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"HF API Error: {response.text}")
+    
+    return np.array(response.json())
 
 
 def _load_index(session_id: str):
@@ -42,10 +48,9 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return b_norm @ a_norm
 
 
-def _retrieve_top_chunks(question: str, chunks, embeddings, top_k: int = 3) -> list[str]:
-    """Encode question and return the top_k most relevant resume chunks."""
-    model = _get_model()
-    query_vec = model.encode([question], convert_to_numpy=True)[0]
+def _retrieve_top_chunks(question: str, chunks, embeddings, hf_token: str, top_k: int = 3) -> list[str]:
+    """Encode question via API and return the top_k most relevant resume chunks."""
+    query_vec = get_embeddings_from_api([question], hf_token)[0]
     scores = _cosine_similarity(query_vec, embeddings)
     top_indices = np.argsort(scores)[::-1][:top_k]
     return [chunks[i] for i in top_indices]
@@ -106,7 +111,7 @@ def query(session_id: str, question: str, hf_token: str) -> str:
     for sq in subqueries:
         sq = sq.strip()
         if sq:
-            result_chunks = _retrieve_top_chunks(sq, chunks, embeddings, top_k=8)
+            result_chunks = _retrieve_top_chunks(sq, chunks, embeddings, hf_token, top_k=8)
             combined_chunks.extend(result_chunks)
             
     # Deduplicate while preserving order
@@ -151,8 +156,8 @@ def evaluate_fit(session_id: str, jd_text: str, hf_token: str) -> str:
     key_skills_resp = _call_hf_api(extract_prompt, hf_token)
     
     combined_chunks = []
-    result_jd = _retrieve_top_chunks(jd_text, chunks, embeddings, top_k=10)
-    result_skills = _retrieve_top_chunks(key_skills_resp, chunks, embeddings, top_k=10)
+    result_jd = _retrieve_top_chunks(jd_text, chunks, embeddings, hf_token, top_k=10)
+    result_skills = _retrieve_top_chunks(key_skills_resp, chunks, embeddings, hf_token, top_k=10)
     
     combined_chunks.extend(result_jd)
     combined_chunks.extend(result_skills)

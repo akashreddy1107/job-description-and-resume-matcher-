@@ -99,7 +99,7 @@ def upload():
         return jsonify({"success": False, "message": "Only PDF and Word documents are supported"}), 400
 
     try:
-        num_chunks = ingest.process_files(session_id, files_info)
+        num_chunks = ingest.process_files(session_id, files_info, HF_TOKEN)
     except Exception as e:
         return jsonify({"success": False, "message": f"Indexing failed: {str(e)}"}), 500
 
