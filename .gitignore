@@ -1,0 +1,29 @@
+# Environment variables — never commit this file
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Data / model cache (regenerated per session)
+data/*.pkl
+data/sessions/
+uploads/*
+!uploads/.gitkeep
+
+# Local databases and scratch output (machine-specific)
+*.db
+outputs.txt
+
+# HuggingFace model cache (downloaded locally)
+.cache/
+
+# IDE
+.vscode/
+.idea/

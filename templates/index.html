@@ -1,35 +1,1965 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-<title>Resume RAG System</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resume Analyzer — HR Intelligence</title>
+    <meta name="description"
+        content="Professional resume screening with RAG: blind PII handling, semantic indexing, and job-fit analysis." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* ───── CSS Reset & Root Variables ───── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-base: #070a0e;
+            --bg-surface: #0e1318;
+            --bg-surface2: #151c24;
+            --bg-surface3: #1c2630;
+            --border: #2a3544;
+            --border-subtle: #1a222c;
+            --text-primary: #e8ecf0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --accent-muted: rgba(59, 130, 246, 0.14);
+            --accent-ring: rgba(59, 130, 246, 0.22);
+            --btn-gradient: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            --success: #34d399;
+            --success-muted: rgba(52, 211, 153, 0.12);
+            --danger: #f87171;
+            --danger-muted: rgba(248, 113, 113, 0.12);
+            --info: #38bdf8;
+            --input-bg: #0e1318;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 9999px;
+            --transition: .2s cubic-bezier(.4, 0, .2, 1);
+            --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.4);
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        /* ───── Layout ───── */
+        .layout {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* ───── Sidebar ───── */
+        .sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            padding: 16px 0;
+            transition: width var(--transition);
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: 68px;
+        }
+
+        .sidebar-top {
+            padding: 0 12px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--transition);
+        }
+
+        .menu-btn:hover {
+            background: var(--bg-surface2);
+        }
+
+        .logo-text {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            transition: opacity var(--transition);
+        }
+
+        .sidebar.collapsed .logo-text {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .new-chat-btn {
+            margin: 8px 12px;
+            padding: 10px 14px;
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: background var(--transition);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--bg-surface2);
+        }
+
+        .new-chat-btn svg {
+            flex-shrink: 0;
+        }
+
+        .sidebar.collapsed .new-chat-btn span {
+            display: none;
+        }
+
+        .sidebar-section-title {
+            padding: 12px 16px 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: .3px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .sidebar-section-title {
+            opacity: 0;
+        }
+
+        .sidebar-item {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            margin: 1px 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: background var(--transition), color var(--transition);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-surface2);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-surface3);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item svg {
+            flex-shrink: 0;
+        }
+
+        .sidebar.collapsed .sidebar-item span {
+            display: none;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            border-top: 1px solid var(--border-subtle);
+            padding: 12px 8px 0;
+        }
+
+        /* ───── Main Content ───── */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ───── Topbar ───── */
+        .topbar {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topbar-brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .topbar-brand-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .topbar-brand-mark {
+            width: 8px;
+            height: 8px;
+            margin-top: 5px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+
+        .topbar-brand-title {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .topbar-brand-titles {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .topbar-brand-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 0.01em;
+        }
+
+        /* ───── Chat Area ───── */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-area::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        /* ───── Welcome Screen ───── */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 200px);
+            text-align: center;
+            padding: 32px 16px;
+        }
+
+        .app-logo {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 24px;
+            background: var(--bg-surface2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-lg);
+            transition: border-color var(--transition), box-shadow var(--transition);
+            color: var(--accent);
+        }
+
+        .app-logo:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-lg), 0 0 0 1px var(--accent-ring);
+        }
+
+        .app-logo svg {
+            stroke: currentColor;
+        }
+
+        .welcome-title {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 30px;
+            font-weight: 600;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .welcome-sub {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 480px;
+            line-height: 1.55;
+        }
+
+        .suggestion-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            max-width: 520px;
+            width: 100%;
+        }
+
+        .suggestion-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            cursor: pointer;
+            text-align: left;
+            transition: background var(--transition), border-color var(--transition), transform var(--transition);
+        }
+
+        .suggestion-card:hover {
+            background: var(--bg-surface2);
+            border-color: rgba(59, 130, 246, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .suggestion-card .card-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .suggestion-card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* ───── Upload Zone ───── */
+        .upload-zone {
+            max-width: 600px;
+            margin: 24px auto;
+            text-align: center;
+        }
+
+        .drop-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px 24px;
+            cursor: pointer;
+            position: relative;
+            transition: border-color var(--transition), background var(--transition);
+            background: var(--bg-surface);
+        }
+
+        .drop-area:hover,
+        .drop-area.drag-over {
+            border-color: var(--accent);
+            background: var(--accent-muted);
+        }
+
+        .drop-area input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .drop-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            background: var(--btn-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .drop-label {
+            font-size: 15px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .drop-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .upload-btn {
+            margin-top: 16px;
+            padding: 10px 28px;
+            border-radius: var(--radius-xl);
+            border: none;
+            background: var(--btn-gradient);
+            color: #f8fafc;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity var(--transition), transform var(--transition);
+            display: none;
+        }
+
+        .upload-btn:hover {
+            opacity: .9;
+            transform: scale(1.02);
+        }
+
+        /* ───── Message Bubbles ───── */
+        .messages {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 24px 0;
+        }
+
+        .msg {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 28px;
+            animation: fadeUp .3s ease;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .msg.user .msg-avatar {
+            background: var(--btn-gradient);
+            font-size: 12px;
+            color: #f8fafc;
+            font-weight: 600;
+        }
+
+        .msg.assistant .msg-avatar {
+            background: var(--bg-surface2);
+        }
+
+        .msg-content {
+            flex: 1;
+        }
+
+        .msg-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .msg-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .msg-time {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .msg-body {
+            font-size: 15px;
+            line-height: 1.65;
+            color: var(--text-primary);
+            background: var(--bg-surface);
+            border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+            padding: 14px 18px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .msg-body :where(h1, h2, h3, h4) {
+            margin: 0.85em 0 0.4em;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.3;
+        }
+
+        .msg-body h1 { font-size: 1.25rem; }
+        .msg-body h2 { font-size: 1.1rem; }
+        .msg-body h3 { font-size: 1rem; }
+
+        .msg-body :where(ul, ol) {
+            margin: 0.5em 0;
+            padding-left: 1.25rem;
+        }
+
+        .msg-body li { margin: 0.25em 0; }
+
+        .msg-body table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin: 12px 0;
+        }
+
+        .msg-body th,
+        .msg-body td {
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            text-align: left;
+        }
+
+        .msg-body th {
+            background: var(--bg-surface2);
+            font-weight: 600;
+        }
+
+        .msg-body code {
+            background: var(--bg-surface2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .msg-body pre {
+            background: var(--bg-surface2);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .msg-body pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .msg-body strong { color: var(--text-primary); }
+
+        .msg.user .msg-body {
+            background: var(--accent-muted);
+            border-color: var(--accent-ring);
+        }
+
+        .msg-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .msg-action-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--transition), color var(--transition);
+        }
+
+        .msg-action-btn:hover {
+            background: var(--bg-surface2);
+            color: var(--text-primary);
+        }
+
+        /* ───── Upload Status Banner ───── */
+        .status-banner {
+            max-width: 760px;
+            margin: 0 auto 16px;
+            padding: 12px 18px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            border: 1px solid;
+            animation: fadeUp .3s ease;
+        }
+
+        .status-banner.success {
+            background: var(--success-muted);
+            border-color: rgba(52, 211, 153, 0.35);
+            color: var(--success);
+        }
+
+        .status-banner.error {
+            background: var(--danger-muted);
+            border-color: rgba(248, 113, 113, 0.35);
+            color: var(--danger);
+        }
+
+        .status-banner.info {
+            background: var(--accent-muted);
+            border-color: var(--accent-ring);
+            color: var(--info);
+        }
+
+        /* ───── Loading Dots ───── */
+        .loading-dots {
+            display: flex;
+            gap: 5px;
+            padding: 4px 0;
+        }
+
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: dot 1.2s infinite;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: .2s;
+            opacity: 0.85;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: .4s;
+            opacity: 0.7;
+        }
+
+        @keyframes dot {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0.8);
+                opacity: .5;
+            }
+
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        /* ───── Input Area ───── */
+        .input-area {
+            padding: 16px;
+            border-top: 1px solid var(--border-subtle);
+            background: var(--bg-base);
+        }
+
+        .input-container {
+            max-width: 760px;
+            margin: 0 auto;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 12px 16px;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        .input-container:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-ring);
+        }
+
+        .input-tools {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 2px;
+        }
+
+        .tool-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--transition), color var(--transition);
+            position: relative;
+        }
+
+        .tool-btn:hover {
+            background: var(--bg-surface2);
+            color: var(--text-primary);
+        }
+
+        .tool-btn input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        #question {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 15px;
+            resize: none;
+            max-height: 160px;
+            min-height: 24px;
+            line-height: 1.5;
+            align-self: center;
+        }
+
+        #question::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            background: var(--btn-gradient);
+            color: #f8fafc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity var(--transition), transform var(--transition);
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            opacity: .88;
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-footer {
+            max-width: 760px;
+            margin: 8px auto 0;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ───── File Preview Chip ───── */
+        .file-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-muted);
+            border: 1px solid var(--accent-ring);
+            border-radius: var(--radius-xl);
+            padding: 4px 10px;
+            font-size: 12px;
+            color: var(--accent-hover);
+            margin-bottom: 8px;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-chip .remove-file {
+            cursor: pointer;
+            margin-left: 2px;
+        }
+
+        /* ───── Typing indicator in sidebar ───── */
+        .pdf-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--success-muted);
+            border: 1px solid rgba(52, 211, 153, 0.35);
+            border-radius: var(--radius-xl);
+            padding: 3px 10px;
+            font-size: 11px;
+            color: var(--success);
+            margin-left: 12px;
+        }
+
+        /* ───── Scrollbar ───── */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        /* ───── "Why we're different" modal ───── */
+        .info-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: diffFade .2s ease;
+        }
+
+        .info-modal-overlay.is-open {
+            display: flex;
+        }
+
+        @keyframes diffFade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .info-modal {
+            width: 100%;
+            max-width: 560px;
+            max-height: min(88vh, 720px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .info-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+
+        .info-modal-header h2 {
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            margin: 0;
+            line-height: 1.35;
+        }
+
+        .info-modal-header p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 6px 0 0;
+            line-height: 1.45;
+        }
+
+        .info-modal-close {
+            flex-shrink: 0;
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface2);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--transition), color var(--transition);
+        }
+
+        .info-modal-close:hover {
+            background: var(--bg-surface3);
+            color: var(--text-primary);
+        }
+
+        .info-modal-body {
+            padding: 16px 20px 22px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--text-secondary);
+        }
+
+        .diff-card {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 14px 12px;
+            margin-bottom: 12px;
+        }
+
+        .diff-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .diff-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .diff-card h3 .num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: var(--accent-muted);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .diff-row {
+            margin-bottom: 10px;
+        }
+
+        .diff-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .diff-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .diff-typical {
+            color: var(--text-secondary);
+        }
+
+        .diff-ours {
+            color: var(--text-primary);
+        }
+
+        .diff-example {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface2);
+            border-left: 3px solid var(--accent);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .diff-example strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .diff-example .ex-line {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        /* ───── Responsive ───── */
+        @media (max-width: 680px) {
+            .sidebar {
+                display: none;
+            }
+
+            .suggestion-grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+    </style>
 </head>
 
 <body>
 
-<h2>Resume Analysis System</h2>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <button class="menu-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <span class="logo-text">Resume Analyzer</span>
+            </div>
 
-<h3>Upload Resume</h3>
-<form action="/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="resume" required>
-    <button type="submit">Upload</button>
-</form>
+            <button class="new-chat-btn" onclick="newChat()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>New analysis</span>
+            </button>
 
-<hr>
+            <div class="sidebar-section-title">Recent</div>
+            <div id="sessionList">
+              {% for s in sessions %}
+              <div class="sidebar-item" id="sidebar-session-{{ s.id }}" onclick="loadSession('{{ s.id }}', '{{ s.session_name|escape }}')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span>{{ s.session_name }}</span>
+              </div>
+              {% else %}
+              <div class="sidebar-item" style="pointer-events:none;color:var(--text-muted);font-size:12px;">
+                  <span>No recent history</span>
+              </div>
+              {% endfor %}
+            </div>
 
-<h3>Ask Question</h3>
+            <div class="sidebar-section-title">Tools</div>
 
-<form action="/ask" method="post">
+            <div class="sidebar-item active" id="tool-single" onclick="setMode('single')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Single Resume Analyzer</span>
+            </div>
 
-<input type="text" name="question" placeholder="Ask something about the resume" size="50">
+            <div class="sidebar-item" id="tool-multi" onclick="setMode('multi')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Candidate Matcher</span>
+            </div>
 
-<button type="submit">Ask</button>
+            <div class="sidebar-bottom">
+                <div class="sidebar-item" onclick="openDiffModal()" style="cursor:pointer;" title="How we compare to typical tools">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    <span>Why we're different</span>
+                </div>
+                <div class="sidebar-item" title="Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2" />
+                    </svg>
+                    <span>Settings</span>
+                </div>
+                <div class="sidebar-item" onclick="window.location='/logout'"
+                    style="color:var(--danger);cursor:pointer;" title="Sign out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    <span>Sign Out</span>
+                </div>
+                <!-- HR User Info -->
+                <div class="sidebar-item"
+                    style="margin-top:4px;border-top:1px solid var(--border-subtle);padding-top:12px;pointer-events:none;">
+                    <div
+                        style="width:28px;height:28px;border-radius:50%;background:var(--btn-gradient);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#f8fafc;flex-shrink:0;">
+                        {{ hr_user[0]|upper }}
+                    </div>
+                    <span style="font-size:13px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;">{{
+                        hr_user }}</span>
+                </div>
+            </div>
+        </aside>
 
-</form>
+        <!-- Main -->
+        <main class="main">
+            <!-- Topbar -->
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div class="topbar-brand" title="Resume Analyzer">
+                        <div class="topbar-brand-row">
+                            <span class="topbar-brand-mark" aria-hidden="true"></span>
+                            <div class="topbar-brand-titles">
+                                <span class="topbar-brand-title">Resume Analyzer</span>
+                                <span class="topbar-brand-sub">AI-assisted resume review</span>
+                            </div>
+                        </div>
+                    </div>
+                    <span id="doc-badge" class="pdf-badge" style="display:none;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="12" />
+                        </svg>
+                        Documents indexed
+                    </span>
+                </div>
+            </div>
 
-{% if answer %}
-<h3>Answer:</h3>
-<p>{{answer}}</p>
-{% endif %}
+            <!-- Chat Area -->
+            <div class="chat-area" id="chatArea">
+                <!-- Welcome screen (shown initially) -->
+                <div class="welcome" id="welcomeScreen">
+                    <!-- Custom App Logo -->
+                    <div class="app-logo" id="appLogoContainer">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <line x1="10" y1="9" x2="8" y2="9" />
+                        </svg>
+                    </div>
 
+                    <h1 class="welcome-title" id="welcomeTitle">Resume Analyzer</h1>
+                    <p class="welcome-sub" id="welcomeSub">Upload your resume and ask questions about the candidate.</p>
+
+                    <!-- Upload Zone (in welcome) -->
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="drop-area" id="dropArea" ondragover="onDragOver(event)"
+                            ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+                            <input type="file" id="welcomeFileInput" name="resume" accept=".pdf,.doc,.docx"
+                                onchange="onFileSelected(this)" />
+                            <div class="drop-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff"
+                                    stroke-width="2">
+                                    <polyline points="16 16 12 12 8 16" />
+                                    <line x1="12" y1="12" x2="12" y2="21" />
+                                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                                </svg>
+                            </div>
+                            <p class="drop-label" id="dropTitle">Drop your resume (PDF or Word) here</p>
+                            <p class="drop-sub">or click to browse</p>
+                        </div>
+                        <button class="upload-btn" id="uploadBtn" onclick="uploadResume()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" style="margin-right:6px;vertical-align:middle;">
+                                <polyline points="16 16 12 12 8 16" />
+                                <line x1="12" y1="12" x2="12" y2="21" />
+                            </svg>
+                            Analyze Resume
+                        </button>
+                    </div>
+
+                    <div class="suggestion-grid" id="suggestionGrid">
+                        <div class="suggestion-card" onclick="useSuggestion('Find Best Match: I am looking for a candidate with skills in [___] and [__] years of experience. Who is the best fit?')">
+                            <div class="card-icon">⚡</div>
+                            <p>Find Best Match: Compare candidates by skills and experience.</p>
+                        </div>
+                        <div class="suggestion-card" onclick="useSuggestion('Summarize the work experience')">
+                            <div class="card-icon">💼</div>
+                            <p>Summarize the work experience</p>
+                        </div>
+                        <div class="suggestion-card" onclick="useSuggestion('What is the educational background?')">
+                            <div class="card-icon">🎓</div>
+                            <p>What is the educational background?</p>
+                        </div>
+                        <div class="suggestion-card" onclick="useSuggestion('List any certifications or achievements')">
+                            <div class="card-icon">🏆</div>
+                            <p>List any certifications or achievements</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Candidate Matcher Panel -->
+                <style>
+                    .matcher-panel {
+                        background: var(--bg-surface2);
+                        border: 1px solid var(--border-subtle);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin: 0 auto 24px auto;
+                        max-width: 650px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                        box-shadow: var(--shadow-lg);
+                    }
+                    .matcher-panel h3 { margin: 0; font-weight: 500; font-size: 15px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+                    .matcher-inputs { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+                    .matcher-inputs label { font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; flex: 2; min-width: 140px; }
+                    .matcher-inputs label:nth-child(2) { flex: 1; min-width: 100px; }
+                    .matcher-inputs input { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 14px; outline: none; transition: border 0.2s; width: 100%; }
+                    .matcher-inputs input:focus { border-color: var(--accent); }
+                    .matcher-btn { background: var(--btn-gradient); color: #f8fafc; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; height: 39px; white-space: nowrap; transition: opacity 0.2s; flex-shrink: 0; }
+                    .matcher-btn:hover { opacity: 0.9; }
+                </style>
+                <!-- Automated JD Panel -->
+                <div id="jdPanel" class="matcher-panel" style="display:none;">
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+                        </svg>
+                        Automated Contextual Fit
+                    </h3>
+                    <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.45;">Paste a full job description. The app pulls relevant resume evidence and returns a structured fit summary: strengths, gaps, and missing information.</div>
+                    <div class="matcher-inputs" style="flex-direction: column; align-items: stretch;">
+                        <textarea id="jdText" placeholder="Paste full Job Description here..." style="background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 14px; outline: none; transition: border 0.2s; width: 100%; min-height: 80px; resize: vertical;"></textarea>
+                        <button class="matcher-btn" onclick="runJDEval()" style="align-self: flex-end;">Evaluate JD</button>
+                    </div>
+                </div>
+
+                <div id="matcherPanel" class="matcher-panel" style="display:none;">
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Candidate Matcher Filter
+                    </h3>
+                    <div class="matcher-inputs">
+                        <label>Skills Required <input type="text" id="matcherSkills" placeholder="e.g. Python, Docker, Leadership"></label>
+                        <label>Years of Exp <input type="number" id="matcherExp" placeholder="e.g. 5"></label>
+                        <button class="matcher-btn" onclick="runMatcher()">Match Candidates</button>
+                    </div>
+                </div>
+
+                <!-- Messages Container -->
+                <div class="messages" id="messages" style="display:none;"></div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div id="fileChipContainer"></div>
+                <div class="input-container">
+                    <div class="input-tools">
+                        <button class="tool-btn" title="Attach PDF">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                            </svg>
+                            <input type="file" id="attachFileInput" name="resume" accept=".pdf,.doc,.docx"
+                                onchange="onFileSelected(this)" />
+                        </button>
+                    </div>
+                    <textarea id="question" rows="1" placeholder="Ask anything about the resume…"
+                        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendQuestion()" title="Send">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-footer">AI-assisted analysis can be wrong. Confirm facts before hiring decisions.
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="diffModalOverlay" class="info-modal-overlay" onclick="if(event.target===this) closeDiffModal()" role="presentation">
+        <div class="info-modal" role="dialog" aria-modal="true" aria-labelledby="diffModalTitle" onclick="event.stopPropagation()">
+            <div class="info-modal-header">
+                <div>
+                    <h2 id="diffModalTitle">Why this analyzer is different</h2>
+                    <p>Plain-language differences from many “upload and chat” resume tools, with small examples.</p>
+                </div>
+                <button type="button" class="info-modal-close" onclick="closeDiffModal()" aria-label="Close" title="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="info-modal-body">
+                <div class="diff-card">
+                    <h3><span class="num">1</span> Fairer signals — hide who they are from the AI</h3>
+                    <p style="margin:0 0 12px;font-size:12px;color:var(--text-muted);line-height:1.5;"><strong style="color:var(--text-secondary);">What “fairer” means here:</strong> You usually want to judge the <em>work</em> (skills, roles, results), not guess traits from a person’s name, email, or phone. This app removes that personal layer <em>before</em> the text is turned into search data, so the AI has less to latch onto besides job-related content.</p>
+                    <div class="diff-row">
+                        <div class="diff-label">Many other tools</div>
+                        <p class="diff-typical">The resume is often read and stored <strong>word-for-word</strong>. The model can still “see” names and contact lines next to skills. That is convenient, but it means the AI may pick up patterns you did not mean to use (for example, associations tied to how a name sounds or where an email domain looks like it is from).</p>
+                    </div>
+                    <div class="diff-row">
+                        <div class="diff-label">This analyzer</div>
+                        <p class="diff-ours">Names, emails, and phone-like numbers are swapped for plain placeholders <strong>first</strong>. Only then is the text chunked and indexed. Questions and answers are grounded in that <strong>cleaned</strong> version, so the system is steered toward skills and history—not toward “who” they are on paper.</p>
+                    </div>
+                    <div class="diff-example">
+                        <strong>Example (before → after)</strong><br />
+                        <strong>Original line on the resume:</strong><br />
+                        “Alex Kim · alex.kim@company.org · +1 555-0100 · Led a team of 8 on a Python data pipeline.”<br />
+                        <div class="ex-line">
+                            <strong>What gets stored for search (simplified):</strong><br />
+                            “[REDACTED_PERSON] · [REDACTED_EMAIL] · [REDACTED_PHONE] · Led a team of 8 on a Python data pipeline.”<br />
+                            The important part for hiring—“led a team,” “Python,” “data pipeline”—stays. The name and contact routes are not there for the model to read.
+                        </div>
+                        <div class="ex-line">
+                            <strong>Why this helps:</strong> You still get answers about skills and impact; you reduce the chance that the AI’s wording is colored by identity details that are not part of the job scorecard. (It is not perfect—always double-check—but the design pushes in a fairer direction.)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diff-card">
+                    <h3><span class="num">2</span> Smarter chunks (semantic chunking)</h3>
+                    <div class="diff-row">
+                        <div class="diff-label">Typical tools</div>
+                        <p class="diff-typical">Some systems cut text every fixed number of characters. That can split a sentence or achievement in the middle.</p>
+                    </div>
+                    <div class="diff-row">
+                        <div class="diff-label">This analyzer</div>
+                        <p class="diff-ours">Text is split mainly at <strong>paragraph boundaries</strong>, then packed into chunks up to a size limit. Whole ideas tend to stay together for search.</p>
+                    </div>
+                    <div class="diff-example">
+                        <strong>Example</strong><br />
+                        Bad split: “… led a team at Go” | “ogle using Python.”<br />
+                        <div class="ex-line">
+                            <strong>Our approach:</strong> keep the paragraph in one piece when possible, so “Google” and “Python” stay in the same retrieval context.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diff-card">
+                    <h3><span class="num">3</span> Multi-hop questions (two searches, one answer)</h3>
+                    <div class="diff-row">
+                        <div class="diff-label">Typical tools</div>
+                        <p class="diff-typical">One search for your whole question. If “marketing” appears in one chunk and “Python” in another, the best match might be missed.</p>
+                    </div>
+                    <div class="diff-row">
+                        <div class="diff-label">This analyzer</div>
+                        <p class="diff-ours">For chat Q&amp;A, the system can <strong>split your question into sub-queries</strong>, search for each, merge the evidence, then answer—so separate facts can still be combined.</p>
+                    </div>
+                    <div class="diff-example">
+                        <strong>Example</strong><br />
+                        You ask: “Do they have <strong>marketing</strong> experience and <strong>Python</strong>?”<br />
+                        <div class="ex-line">
+                            <strong>Behind the scenes:</strong> Sub-search A pulls “marketing” passages; sub-search B pulls “Python” passages; the answer uses both. A single combined search might return neither chunk as the top hit.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diff-card">
+                    <h3><span class="num">4</span> Job-description fit (structured output)</h3>
+                    <div class="diff-row">
+                        <div class="diff-label">Typical tools</div>
+                        <p class="diff-typical">You might paste a JD into a chat and get a free-form paragraph. Easy to read, but not always consistent across candidates.</p>
+                    </div>
+                    <div class="diff-row">
+                        <div class="diff-label">This analyzer</div>
+                        <p class="diff-ours"><strong>Automated Contextual Fit</strong> pulls relevant resume text against the JD and asks for a structured review: strengths, gaps, and missing information—so comparisons are easier.</p>
+                    </div>
+                    <div class="diff-example">
+                        <strong>Example</strong><br />
+                        You paste a JD that requires “Kubernetes + 5 years backend.”<br />
+                        <div class="ex-line">
+                            <strong>What you get:</strong> bullets for what matches, what’s unclear, and what’s missing—instead of only a one-line “looks good.”
+                        </div>
+                    </div>
+                </div>
+
+                <p style="margin:14px 0 0;font-size:12px;color:var(--text-muted);">Many products on the web share similar ideas; this app implements the pipeline above in this workspace. Always verify results before hiring decisions.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let resumeUploaded = false;
+        let selectedFiles = [];
+        let messageCounter = 0;
+        let currentSessionId = null;
+        let currentMode = 'single';
+
+        /* ── Tools / Mode Swapping ── */
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Adjust Sidebar Active States
+            document.querySelectorAll('#tool-single, #tool-multi').forEach(el => el.classList.remove('active'));
+            document.getElementById('tool-' + mode).classList.add('active');
+
+            // Hard reset active view
+            newChat();
+
+            const dropTitle = document.getElementById('dropTitle');
+            const welcomeTitle = document.getElementById('welcomeTitle');
+            const welcomeSub = document.getElementById('welcomeSub');
+            const welcomeFileInput = document.getElementById('welcomeFileInput');
+            const attachFileInput = document.getElementById('attachFileInput');
+            const suggestions = document.getElementById('suggestionGrid');
+            const appLogo = document.getElementById('appLogoContainer');
+
+            if (mode === 'single') {
+                welcomeTitle.innerHTML = 'Single Resume Analyzer';
+                welcomeSub.innerHTML = 'Upload one resume and ask questions in plain language.';
+                dropTitle.innerHTML = 'Drop your resume (PDF or Word) here';
+                
+                welcomeFileInput.removeAttribute('multiple');
+                attachFileInput.removeAttribute('multiple');
+                
+                appLogo.innerHTML = `
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                `;
+                
+                suggestions.innerHTML = `
+                    <div class="suggestion-card" onclick="useSuggestion('Summarize the work experience')">
+                        <div class="card-icon">💼</div>
+                        <p>Summarize the work experience</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('What is the educational background?')">
+                        <div class="card-icon">🎓</div>
+                        <p>What is the educational background?</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('What are the key technical skills?')">
+                        <div class="card-icon">💻</div>
+                        <p>What are the key technical skills?</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('List any certifications or achievements')">
+                        <div class="card-icon">🏆</div>
+                        <p>List any certifications or achievements</p>
+                    </div>
+                `;
+            } else {
+                welcomeTitle.innerHTML = 'Candidate Skill Matcher';
+                welcomeSub.innerHTML = 'Upload multiple résumés, compare with guided prompts, and surface the strongest match for a role.';
+                dropTitle.innerHTML = 'Drop multiple resumes (PDF/Word) here';
+                
+                welcomeFileInput.setAttribute('multiple', 'multiple');
+                attachFileInput.setAttribute('multiple', 'multiple');
+                
+                appLogo.innerHTML = `
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                `;
+                
+                suggestions.innerHTML = `
+                    <div class="suggestion-card" onclick="useSuggestion('Find Best Match: I am looking for a candidate with skills in [___] and [__] years of experience. Who is the best fit?')">
+                        <div class="card-icon">⚡</div>
+                        <p>Find Best Match: Compare candidates by skills and experience.</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('Compare the educational backgrounds of the candidates.')">
+                        <div class="card-icon">🎓</div>
+                        <p>Compare their educational backgrounds.</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('Which candidate has the most leadership or management experience?')">
+                        <div class="card-icon">📈</div>
+                        <p>Compare leadership and management experience.</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('List the strengths of each candidate back to back.')">
+                        <div class="card-icon">⚖️</div>
+                        <p>List the strengths of each candidate.</p>
+                    </div>
+                `;
+            }
+        }
+
+
+        /* ── Session History Loading ── */
+        async function loadSession(sessionId, sessionName) {
+            currentSessionId = sessionId;
+            resumeUploaded = true;
+            
+            // Highlight sidebar item
+            document.querySelectorAll('#sessionList .sidebar-item').forEach(el => el.classList.remove('active'));
+            let activeItem = document.getElementById('sidebar-session-' + sessionId);
+            if(activeItem) activeItem.classList.add('active');
+
+            // Reset UI for load
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('messages').style.display = 'block';
+            document.getElementById('messages').innerHTML = '';
+            document.getElementById('doc-badge').style.display = 'inline-flex';
+            
+            const loadId = addLoadingMessage();
+            try {
+                const res = await fetch('/api/session/' + sessionId);
+                const data = await res.json();
+                removeMessage(loadId);
+                
+                if (data.success) {
+                    // Populate files
+                    const container = document.getElementById('fileChipContainer');
+                    container.innerHTML = '';
+                    data.documents.forEach(doc => {
+                        container.innerHTML += `
+                          <div class="file-chip" style="margin-left:12px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            ${doc.filename}
+                          </div>`;
+                    });
+
+                    if (currentMode === 'multi') {
+                        document.getElementById('matcherPanel').style.display = 'flex';
+                        document.getElementById('jdPanel').style.display = 'none';
+                    } else {
+                        document.getElementById('matcherPanel').style.display = 'none';
+                        document.getElementById('jdPanel').style.display = 'flex';
+                    }
+
+                    // Populate chats
+                    if (data.messages.length === 0) {
+                        addMessage('assistant', `✅ <strong>Session Restored</strong><br/>Resumes loaded successfully. You can begin querying!`);
+                    } else {
+                        data.messages.forEach(msg => {
+                            if (msg.role === 'user') {
+                                addMessage('user', msg.content);
+                            } else {
+                                addMessage('assistant', formatAnswer(msg.content));
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                removeMessage(loadId);
+                addMessage('assistant', `❌ Network error loading session: ${err.message}`, true);
+            }
+        }
+
+        /* ── Sidebar toggle ── */
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        function openDiffModal() {
+            document.getElementById('diffModalOverlay').classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diffModalOverlay').classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeDiffModal();
+        });
+
+        /* ── New chat ── */
+        function newChat() {
+            resumeUploaded = false;
+            selectedFiles = [];
+            currentSessionId = null;
+            document.getElementById('welcomeScreen').style.display = 'flex';
+            document.getElementById('messages').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            document.getElementById('doc-badge').style.display = 'none';
+            document.getElementById('fileChipContainer').innerHTML = '';
+            document.getElementById('uploadBtn').style.display = 'none';
+            document.getElementById('question').value = '';
+            document.getElementById('matcherPanel').style.display = 'none';
+            document.getElementById('jdPanel').style.display = 'none';
+            
+            // Re-sync correct active mode when new chat starts
+            if (currentMode === 'single') {
+                document.getElementById('welcomeFileInput').removeAttribute('multiple');
+                document.getElementById('attachFileInput').removeAttribute('multiple');
+            } else {
+                document.getElementById('welcomeFileInput').setAttribute('multiple', 'multiple');
+                document.getElementById('attachFileInput').setAttribute('multiple', 'multiple');
+            }
+            
+            updateSendBtn();
+        }
+
+        /* ── File selection ── */
+        function onFileSelected(input) {
+            if (!input.files || input.files.length === 0) return;
+            
+            if (currentMode === 'single' && input.files.length > 1) {
+                // Ignore multiple files if user somehow drags multiple in single mode
+                selectedFiles = [input.files[0]];
+            } else {
+                selectedFiles = Array.from(input.files);
+            }
+            
+            document.getElementById('welcomeFileInput').value = '';
+            document.getElementById('attachFileInput').value = '';
+
+            const container = document.getElementById('fileChipContainer');
+            container.innerHTML = '';
+            selectedFiles.forEach(file => {
+                container.innerHTML += `
+                  <div class="file-chip" style="margin-left:12px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    ${file.name}
+                    <span class="remove-file" onclick="clearFile()" style="cursor:pointer;">✕</span>
+                  </div>`;
+            });
+
+            document.getElementById('uploadBtn').style.display = 'inline-flex';
+            document.getElementById('dropArea').style.borderColor = 'var(--accent)';
+            updateSendBtn();
+        }
+
+        function clearFile() {
+            selectedFiles = [];
+            document.getElementById('fileChipContainer').innerHTML = '';
+            document.getElementById('uploadBtn').style.display = 'none';
+            document.getElementById('dropArea').style.borderColor = '';
+            updateSendBtn();
+        }
+
+        /* ── Drag & Drop ── */
+        function onDragOver(e) { e.preventDefault(); document.getElementById('dropArea').classList.add('drag-over'); }
+        function onDragLeave() { document.getElementById('dropArea').classList.remove('drag-over'); }
+        function onDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropArea').classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                onFileSelected({ files: e.dataTransfer.files });
+            }
+        }
+
+        /* ── Resume Upload ── */
+        async function uploadResume() {
+            if (selectedFiles.length === 0) return;
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading…';
+
+            showMessages();
+            addMessage('user', `📄 Uploading ${selectedFiles.length} resume(s)...`);
+            const loadId = addLoadingMessage();
+
+            try {
+                const formData = new FormData();
+                selectedFiles.forEach(f => formData.append('resume', f));
+                
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                removeMessage(loadId);
+
+                if (data.success) {
+                    resumeUploaded = true;
+                    currentSessionId = data.session_id;
+                    document.getElementById('doc-badge').style.display = 'inline-flex';
+                    
+                    // Add new session item temporarily to sidebar
+                    const list = document.getElementById('sessionList');
+                    // Remove "No history" text if present
+                    if (list.innerText.includes('No recent history')) { list.innerHTML = ''; }
+                    
+                    const el = document.createElement('div');
+                    el.className = 'sidebar-item active';
+                    el.id = 'sidebar-session-' + data.session_id;
+                    el.onclick = () => loadSession(data.session_id, data.session_name);
+                    
+                    const icon = currentMode === 'single' ? 
+                        `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>` : 
+                        `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+                        
+                    el.innerHTML = `
+                      ${icon}
+                      <span>${data.session_name}</span>`;
+                    list.insertBefore(el, list.firstChild);
+                    document.querySelectorAll('#sessionList .sidebar-item').forEach(item => { if (item.id !== el.id) item.classList.remove('active'); });
+
+                    if (currentMode === 'multi') {
+                        document.getElementById('matcherPanel').style.display = 'flex';
+                        document.getElementById('jdPanel').style.display = 'none';
+                    } else {
+                        document.getElementById('matcherPanel').style.display = 'none';
+                        document.getElementById('jdPanel').style.display = 'flex';
+                    }
+
+                    addMessage('assistant', `✅ <strong>${data.message}</strong><br/>Ready for analysis! You can now ask questions about these candidates or use "Find Best Match".`);
+                } else {
+                    addMessage('assistant', `❌ ${data.message || 'Upload failed. Please try again.'}`, true);
+                }
+            } catch (err) {
+                removeMessage(loadId);
+                addMessage('assistant', `❌ Network error: ${err.message}`, true);
+            }
+
+            clearFile();
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/></svg>Analyze Resume`;
+            updateSendBtn();
+        }
+
+        /* ── Matcher Logic ── */
+        function runMatcher() {
+            const skills = document.getElementById('matcherSkills').value.trim();
+            const exp = document.getElementById('matcherExp').value.trim();
+            if(!skills && !exp) { alert('Please enter at least skills or experience to match.'); return; }
+            
+            const expPart = exp ? ` and ${exp}+ years of experience` : '';
+            const skillPart = skills ? `skills in ${skills}` : 'specific skills';
+            const query = `Find Best Match: I am looking for candidates with ${skillPart}${expPart}. Who is the best fit? Please compare the candidates and cite their filenames.`;
+            
+            document.getElementById('question').value = query;
+            sendQuestion();
+        }
+
+        async function runJDEval() {
+            const jd = document.getElementById('jdText').value.trim();
+            if(!jd) { alert('Please paste a Job Description first.'); return; }
+            if(!currentSessionId) { alert('Please upload resumes first.'); return; }
+
+            document.getElementById('jdText').value = '';
+            showMessages();
+            addMessage('user', `**Requested JD Evaluation for:**<br/>${jd.substring(0,100)}...`);
+            const loadId = addLoadingMessage();
+
+            try {
+                const formData = new FormData();
+                formData.append('jd_text', jd);
+                formData.append('session_id', currentSessionId);
+                
+                const res = await fetch('/evaluate_jd', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                removeMessage(loadId);
+
+                if (data.success && data.answer) {
+                    addMessage('assistant', formatAnswer(data.answer));
+                } else {
+                    addMessage('assistant', `⚠️ ${data.message || 'Could not retrieve an evaluation.'}`, true);
+                }
+            } catch (err) {
+                removeMessage(loadId);
+                addMessage('assistant', `❌ Error: ${err.message}`, true);
+            }
+        }
+
+        /* ── Ask Question ── */
+        async function sendQuestion() {
+            const textarea = document.getElementById('question');
+            const q = textarea.value.trim();
+
+            if (selectedFiles.length > 0 && !q) {
+                return uploadResume();
+            }
+
+            if (!q) return;
+
+            textarea.value = '';
+            autoResize(textarea);
+            updateSendBtn();
+            showMessages();
+            addMessage('user', q);
+            const loadId = addLoadingMessage();
+
+            try {
+                const formData = new FormData();
+                formData.append('question', q);
+                if (currentSessionId) formData.append('session_id', currentSessionId);
+                
+                const res = await fetch('/ask', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                removeMessage(loadId);
+
+                if (data.success && data.answer) {
+                    addMessage('assistant', formatAnswer(data.answer));
+                } else if (!resumeUploaded) {
+                    addMessage('assistant', '⚠️ Please structure a session by uploading resumes first.', true);
+                } else {
+                    addMessage('assistant', `⚠️ ${data.message || 'Could not retrieve an answer.'}`, true);
+                }
+            } catch (err) {
+                removeMessage(loadId);
+                addMessage('assistant', `❌ Error: ${err.message}`, true);
+            }
+        }
+
+        /* ── Helpers ── */
+        function showMessages() {
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('messages').style.display = 'block';
+        }
+
+        function addMessage(role, html, isError = false) {
+            messageCounter++;
+            const id = 'msg-' + messageCounter;
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const isUser = role === 'user';
+
+            const el = document.createElement('div');
+            el.className = `msg ${role}`;
+            el.id = id;
+            el.innerHTML = `
+      <div class="msg-avatar">
+        ${isUser
+                    ? 'U'
+                    : `<div style="width:100%; height:100%; border-radius:50%; background:var(--btn-gradient); display:flex; align-items:center; justify-content:center; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+              </svg>
+            </div>`}
+      </div>
+      <div class="msg-content">
+        <div class="msg-header">
+          <span class="msg-name">${isUser ? 'You' : 'Assistant'}</span>
+          <span class="msg-time">${time}</span>
+        </div>
+        <div class="msg-body">${html}</div>
+        ${!isUser ? `<div class="msg-actions">
+          <button class="msg-action-btn" title="Copy" onclick="copyMsg('${id}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button class="msg-action-btn" title="Like">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+            </svg>
+          </button>
+          <button class="msg-action-btn" title="Dislike">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+            </svg>
+          </button>
+        </div>` : ''}
+      </div>`;
+            document.getElementById('messages').appendChild(el);
+            el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            return id;
+        }
+
+        function addLoadingMessage() {
+            messageCounter++;
+            const id = 'msg-' + messageCounter;
+            const el = document.createElement('div');
+            el.className = 'msg assistant';
+            el.id = id;
+            el.innerHTML = `
+      <div class="msg-avatar">
+        <div style="width:100%; height:100%; border-radius:50%; background:var(--btn-gradient); display:flex; align-items:center; justify-content:center; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+          </svg>
+        </div>
+      </div>
+      <div class="msg-content">
+        <div class="msg-header"><span class="msg-name">Assistant</span></div>
+        <div class="msg-body"><div class="loading-dots"><span></span><span></span><span></span></div></div>
+      </div>`;
+            document.getElementById('messages').appendChild(el);
+            el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            return id;
+        }
+
+        function removeMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function formatAnswer(text) {
+            if (typeof marked !== "undefined") {
+                return marked.parse(text);
+            }
+            return text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>');
+        }
+
+        function copyMsg(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const body = el.querySelector('.msg-body');
+            navigator.clipboard.writeText(body.innerText).catch(() => { });
+        }
+
+        /* ── Suggestions ── */
+        function useSuggestion(text) {
+            document.getElementById('question').value = text;
+            updateSendBtn();
+            showMessages();
+            if (!resumeUploaded) {
+                addMessage('assistant', '⚠️ Please upload your resume first — then I can answer that question!', true);
+            } else {
+                sendQuestion();
+            }
+        }
+
+        /* ── Input handling ── */
+        function handleKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (selectedFile && !document.getElementById('question').value.trim()) {
+                    uploadResume();
+                } else {
+                    sendQuestion();
+                }
+            }
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+            updateSendBtn();
+        }
+
+        function updateSendBtn() {
+            const q = document.getElementById('question').value.trim();
+            document.getElementById('sendBtn').disabled = !q && selectedFiles.length === 0;
+        }
+
+        function focusInput() {
+            document.getElementById('question').focus();
+        }
+
+        function jumpToUpload() {
+            if (document.getElementById('welcomeScreen').style.display !== 'none') {
+                document.getElementById('dropArea').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        /* ── Init ── */
+        document.getElementById('sendBtn').disabled = true;
+    </script>
 </body>
+
 </html>
